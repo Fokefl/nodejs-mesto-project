@@ -63,33 +63,18 @@ const userSchema = new mongoose.Schema<IUser, UserModel>({
   },
 }, { versionKey: false });
 
-userSchema.pre('save', async function preSave(next) {
-  // Если пароль не менялся и документ не новый - пропускаем
-  if (!this.isModified('password') && !this.isNew) {
-    return next();
-  }
-
-  try {
-    this.password = await bcrypt.hash(this.password, 12);
-    return next();
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      return next(error);
-    }
-    return next(createServerError(SERVER_ERROR));
-  }
-});
-
 userSchema.static('findUserByCredentials', async function findUserByCredentials(
   email: string,
   password: string,
 ) {
-  const user = await this.findOne({ email })
-    .select('+password name about avatar email _id')
-    .lean()
-    .orFail(() => createUnauthorizedError(INCORRECT_AUTH_DATA_ERROR));
+  const user = await this.findOne({ email }).select('+password').lean();
+  
+  if (!user) {
+    throw createUnauthorizedError(INCORRECT_AUTH_DATA_ERROR);
+  }
 
   const matched = await bcrypt.compare(password, user.password);
+  
   if (!matched) {
     throw createUnauthorizedError(INCORRECT_AUTH_DATA_ERROR);
   }
